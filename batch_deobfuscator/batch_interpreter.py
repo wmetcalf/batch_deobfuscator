@@ -95,7 +95,7 @@ class BatchDeobfuscator:
 
     def get_value(self, variable):
 
-        str_substitution = r"%\s*(?P<variable>[A-Za-z0-9#$'()*+,-.?@\[\]_`{}~ ]+)" r"(:~\s*(?P<index>[+-]?\d+)\s*,\s*(?P<length>[+-]?\d+)\s*)?%"
+        str_substitution = r"%\s*(?P<variable>[^\n\x25]+)" r"(:~\s*(?P<index>[+-]?\d+)\s*,\s*(?P<length>[+-]?\d+)\s*)?%"
 
         matches = re.finditer(str_substitution, variable, re.MULTILINE)
 
@@ -145,8 +145,8 @@ class BatchDeobfuscator:
         else:
             # interpreting set command
             set_command = (
-                r"(\s*(call)?\s*set\s+\"?(?P<var>[A-Za-z0-9#$'()*+,-.?@\[\]_`{}~ ]+)=\s*(?P<val>[^\"\n]*)\"?)|"
-                r"(\s*(call)?\s*set\s+/p\s+\"?(?P<input>[A-Za-z0-9#$'()*+,-.?@\[\]_`{}~ ]+)=[^\"\n]*\"?)"
+                r"(\s*(call)?\s*set\s+\"?(?P<var>[^\"\n=]*)=\s*(?P<val>(\"[^\"\n]*\")|[^\"\n\s]*))|"
+                r"(\s*(call)?\s*set\s+/p\s+(?P<input>(\"[^\"\n]*\")|[^\"\n\s]*))"
             )
             match = re.search(set_command, normalized_comm, re.IGNORECASE)
             if match is not None:
