@@ -370,16 +370,19 @@ class BatchDeobfuscator:
         return (var_name, var_value)
 
     def interpret_curl(self, cmd):
-        # Batch specific obfuscation that is not handled before for echo/variable purposes, can be stripped here
-        cmd = cmd.replace('""', "")
-        split_cmd = shlex.split(cmd, posix=False)
-        args, unknown = self.curl_parser.parse_known_args(split_cmd[1:])
+        try:
+            # Batch specific obfuscation that is not handled before for echo/variable purposes, can be stripped here
+            cmd = cmd.replace('""', "")
+            split_cmd = shlex.split(cmd, posix=False)
+            args, unknown = self.curl_parser.parse_known_args(split_cmd[1:])
 
-        dst = args.output
-        if args.remote_name:
-            dst = os.path.basename(urlparse(args.url).path)
+            dst = args.output
+            if args.remote_name:
+                dst = os.path.basename(urlparse(args.url).path)
 
-        self.traits["download"].append((cmd, {"src": args.url, "dst": dst}))
+            self.traits["download"].append((cmd, {"src": args.url, "dst": dst}))
+        except:
+            return
 
     def interpret_powershell(self, normalized_comm):
         try:
