@@ -213,7 +213,7 @@ class BatchDeobfuscator:
                     # Usually an output redirection, we want to keep it on the same line
                     pass
                 elif char == "&" or char == "|":
-                    cmd = logical_line[start_command:counter].strip()
+                    cmd = logical_line[start_command:counter].strip("\r\n")
                     if cmd != "":
                         for part in self.get_commands_special_statement(cmd):
                             yield part
@@ -226,13 +226,12 @@ class BatchDeobfuscator:
 
             counter += 1
 
-        last_com = logical_line[start_command:].strip()
+        last_com = logical_line[start_command:].strip("\r\n")
         if last_com != "":
             for part in self.get_commands_special_statement(last_com):
                 yield part
 
     def get_value(self, variable):
-
         str_substitution = (
             r"([%!])(?P<variable>[^\n\x25]+)"
             r"("
