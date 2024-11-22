@@ -171,7 +171,7 @@ class BatchDeobfuscator:
             r"(?P<parameter>.+)"
             r"\s+IN\s+\((?P<in_set>[^\)]+)\)"
             r"\s+DO\s+"
-            r"(?P<open_paren>\()?)(?P<command>[^\)]*)(?P<close_paren>\))?"
+            r"(?P<open_paren>\()?\s*)(?P<command>[^\)]*)(?P<close_paren>\)\s*)?"
         )
         match = re.search(for_statement, statement, re.IGNORECASE)
         if match is not None:
@@ -233,9 +233,9 @@ class BatchDeobfuscator:
 
     def get_value(self, variable):
         str_substitution = (
-            r"([%!])(?P<variable>[^\n\x25]+)"
+            r"([%!])(?P<variable>[^\n\x25:]+)"
             r"("
-            r"(:~\s*(?P<index>[+-]?\d+)\s*(?:,\s*(?P<length>[+-]?\d+))?\s*)|"
+            r"(:\~\s*(?P<index>[+-]?\d+)\s*(?:,\s*(?P<length>[+-]?\d+))?\s*)|"
             r"(:(?P<s1>[^=]+)=(?P<s2>[^=]*))"
             r")?(\1)"
         )
@@ -485,6 +485,9 @@ class BatchDeobfuscator:
 
         if normalized_comm_lower.startswith("powershell"):
             self.interpret_powershell(normalized_comm)
+
+        if normalized_comm_lower.startswith("goto"):
+            self.traits["jumps"].append({"Label": normalized_comm[4:].lstrip()})
 
     # pushdown automata
     def normalize_command(self, command):
@@ -736,16 +739,19 @@ def interpret_logical_line(deobfuscator, logical_line, tab=""):
     commands = deobfuscator.get_commands(logical_line)
     for command in commands:
         normalized_comm = deobfuscator.normalize_command(command)
-        deobfuscator.interpret_command(normalized_comm)
-        print(tab + normalized_comm)
-        if len(deobfuscator.exec_cmd) > 0:
-            print(tab + "[CHILD CMD]")
-            for child_cmd in deobfuscator.exec_cmd:
-                child_deobfuscator = copy.deepcopy(deobfuscator)
-                child_deobfuscator.exec_cmd.clear()
-                interpret_logical_line(child_deobfuscator, child_cmd, tab=tab + "\t")
-            deobfuscator.exec_cmd.clear()
-            print(tab + "[END OF CHILD CMD]")
+        if len(list(deobfuscator.get_commands(normalized_comm))) > 1:
+            interpret_logical_line(deobfuscator, normalized_comm, tab)
+        else:
+            deobfuscator.interpret_command(normalized_comm)
+            print(tab + normalized_comm)
+            if len(deobfuscator.exec_cmd) > 0:
+                print(tab + "[CHILD CMD]")
+                for child_cmd in deobfuscator.exec_cmd:
+                    child_deobfuscator = copy.deepcopy(deobfuscator)
+                    child_deobfuscator.exec_cmd.clear()
+                    interpret_logical_line(child_deobfuscator, child_cmd, tab=tab + "\t")
+                deobfuscator.exec_cmd.clear()
+                print(tab + "[END OF CHILD CMD]")
 
 
 def interpret_logical_line_str(deobfuscator, logical_line, tab=""):
@@ -753,16 +759,19 @@ def interpret_logical_line_str(deobfuscator, logical_line, tab=""):
     commands = deobfuscator.get_commands(logical_line)
     for command in commands:
         normalized_comm = deobfuscator.normalize_command(command)
-        deobfuscator.interpret_command(normalized_comm)
-        str = str + tab + normalized_comm
-        if len(deobfuscator.exec_cmd) > 0:
-            str = str + tab + "[CHILD CMD]"
-            for child_cmd in deobfuscator.exec_cmd:
-                child_deobfuscator = copy.deepcopy(deobfuscator)
-                child_deobfuscator.exec_cmd.clear()
-                interpret_logical_line(child_deobfuscator, child_cmd, tab=tab + "\t")
-            deobfuscator.exec_cmd.clear()
-            str = str + tab + "[END OF CHILD CMD]"
+        if len(list(deobfuscator.get_commands(normalized_comm))) > 1:
+            str = str + tab + interpret_logical_line_str(deobfuscator, normalized_comm, tab)
+        else:
+            deobfuscator.interpret_command(normalized_comm)
+            str = str + tab + normalized_comm
+            if len(deobfuscator.exec_cmd) > 0:
+                str = str + tab + "[CHILD CMD]"
+                for child_cmd in deobfuscator.exec_cmd:
+                    child_deobfuscator = copy.deepcopy(deobfuscator)
+                    child_deobfuscator.exec_cmd.clear()
+                    interpret_logical_line(child_deobfuscator, child_cmd, tab=tab + "\t")
+                deobfuscator.exec_cmd.clear()
+                str = str + tab + "[END OF CHILD CMD]"
     return str
 
 
@@ -793,11 +802,13 @@ if __name__ == "__main__":
     deobfuscator = BatchDeobfuscator()
 
     if args[0].file is not None:
-
         file_path = args[0].file
 
         for logical_line in deobfuscator.read_logical_line(args[0].file):
             interpret_logical_line(deobfuscator, logical_line)
-    else:
-        print("Please enter an obfuscated batch command:")
-        interpret_logical_line(deobfuscator, input())
+
+        if deobfuscator.traits["jumps"]:
+            # The batch file contains "goto" instructions, and sometimes we get
+            # decent results by simply scanning the file again.
+            for logical_line in deobfuscator.read_logical_line(args[0].file):
+                interpret_logical_line(deobfuscator, logical_line)
