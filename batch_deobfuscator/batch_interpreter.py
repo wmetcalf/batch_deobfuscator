@@ -788,7 +788,8 @@ def handle_bat_file(deobfuscator, fpath):
 
             if deobfuscator.traits["jumps"]:
                 # The batch file contains "goto" instructions, and sometimes we get
-                # decent results by simply scanning the file again.
+                # decent results by simply resetting and scanning the file again.
+                strs = []
                 for logical_line in deobfuscator.read_logical_line(fpath):
                     try:
                         strs.append(interpret_logical_line_str(deobfuscator, logical_line))
